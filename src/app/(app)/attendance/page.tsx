@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { getCurrentUser, checkin, checkout, getTodayAttendance, getAttendanceByUser, User, Attendance } from '@/lib/store';
+import { compressImage } from '@/lib/compress';
 
 export default function AttendancePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -33,17 +34,18 @@ export default function AttendancePage() {
     setTimeout(() => fileInputRef.current?.click(), 0);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = '';
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       if (typeof reader.result === 'string') {
-        setPhoto(reader.result);
+        const compressed = await compressImage(reader.result, 640, 0.5);
+        setPhoto(compressed);
       }
     };
     reader.readAsDataURL(file);
-    e.target.value = '';
   };
 
   const confirmAction = async () => {
@@ -55,16 +57,26 @@ export default function AttendancePage() {
       const record = await getTodayAttendance(uid);
       if (!record?.checkinTime) {
         await checkin(uid, photo);
+        setTodayRecord({
+          id: 0, userId: uid, date: new Date().toISOString().split('T')[0],
+          checkinTime: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+          checkoutTime: null, checkinPhoto: photo, checkoutPhoto: null,
+        });
         setMsg('Check-in thành công!');
       } else if (!record.checkoutTime) {
         await checkout(uid, photo);
+        setTodayRecord({
+          ...record,
+          checkoutTime: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+          checkoutPhoto: photo,
+        });
         setMsg('Check-out thành công!');
       } else {
         setMsg('Hôm nay đã checkout rồi.');
         return;
       }
       setPhoto(null);
-      await loadData();
+      loadData();
     } catch {
       setMsg('Lỗi kết nối server!');
     } finally {
@@ -72,9 +84,7 @@ export default function AttendancePage() {
     }
   };
 
-  const cancelCapture = () => {
-    setPhoto(null);
-  };
+  const cancelCapture = () => { setPhoto(null); };
 
   const statusBadge = (record: Attendance) => {
     const isFull = record.checkinTime && record.checkoutTime;
@@ -93,14 +103,7 @@ export default function AttendancePage() {
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Chấm công</h1>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="user"
-        className="hidden"
-        onChange={handleFileChange}
-      />
+      <input ref={fileInputRef} type="file" accept="image/*" capture="user" className="hidden" onChange={handleFileChange} />
 
       {msg && (
         <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${
@@ -115,30 +118,24 @@ export default function AttendancePage() {
             <p className="text-sm text-gray-500 mb-1">Check-in</p>
             <p className="text-lg font-bold text-gray-800">{todayRecord?.checkinTime || '---'}</p>
             {todayRecord?.checkinPhoto && (
-              <img src={todayRecord.checkinPhoto} alt="Checkin" className="mt-2 w-20 h-16 object-cover rounded border" />
+              <img src={todayRecord.checkinPhoto} alt="Checkin" className="mt-2 w-20 h-16 object-cover rounded border" loading="lazy" />
             )}
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500 mb-1">Check-out</p>
             <p className="text-lg font-bold text-gray-800">{todayRecord?.checkoutTime || '---'}</p>
             {todayRecord?.checkoutPhoto && (
-              <img src={todayRecord.checkoutPhoto} alt="Checkout" className="mt-2 w-20 h-16 object-cover rounded border" />
+              <img src={todayRecord.checkoutPhoto} alt="Checkout" className="mt-2 w-20 h-16 object-cover rounded border" loading="lazy" />
             )}
           </div>
         </div>
         <div className="flex gap-3">
-          <button
-            onClick={handleCapture}
-            disabled={!!todayRecord?.checkinTime}
-            className="flex-1 px-5 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
-          >
+          <button onClick={handleCapture} disabled={!!todayRecord?.checkinTime}
+            className="flex-1 px-5 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed">
             Check-in
           </button>
-          <button
-            onClick={handleCapture}
-            disabled={!todayRecord?.checkinTime || !!todayRecord?.checkoutTime}
-            className="flex-1 px-5 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
-          >
+          <button onClick={handleCapture} disabled={!todayRecord?.checkinTime || !!todayRecord?.checkoutTime}
+            className="flex-1 px-5 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed">
             Check-out
           </button>
         </div>
@@ -153,7 +150,8 @@ export default function AttendancePage() {
               <button onClick={cancelCapture} className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition cursor-pointer">
                 Hủy
               </button>
-              <button onClick={confirmAction} disabled={loading} className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed">
+              <button onClick={confirmAction} disabled={loading}
+                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed">
                 {loading ? 'Đang lưu...' : 'Xác nhận'}
               </button>
             </div>

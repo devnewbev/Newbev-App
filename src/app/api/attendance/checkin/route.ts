@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getSupabase from '@/lib/db';
+import { getTodayStr, getTimeStr } from '@/lib/timezone';
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,8 +9,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing userId or photo' }, { status: 400 });
     }
     const supabase = getSupabase();
-    const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    const todayStr = new Date().toISOString().split('T')[0];
+    const now = getTimeStr();
+    const todayStr = getTodayStr();
 
     const { data: existing } = await supabase
       .from('attendance')

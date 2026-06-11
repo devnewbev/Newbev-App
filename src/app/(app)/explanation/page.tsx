@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { getCurrentUser, createExplanation, getExplanationsByUser, User, Explanation } from '@/lib/store';
+import { compressImage } from '@/lib/compress';
 
 export default function ExplanationPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -28,14 +29,15 @@ export default function ExplanationPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = '';
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       if (typeof reader.result === 'string') {
-        setPhoto(reader.result);
+        const compressed = await compressImage(reader.result, 800, 0.5);
+        setPhoto(compressed);
       }
     };
     reader.readAsDataURL(file);
-    e.target.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -174,7 +176,7 @@ export default function ExplanationPage() {
                   <td className="py-3 px-2">
                     {e.photo ? (
                       <img src={e.photo} alt="Proof" className="w-12 h-10 object-cover rounded border cursor-pointer"
-                        onClick={() => window.open(e.photo!, '_blank')} />
+                        loading="lazy" onClick={() => window.open(e.photo!, '_blank')} />
                     ) : '---'}
                   </td>
                   <td className="py-3 px-2">{statusBadge(e.status)}</td>

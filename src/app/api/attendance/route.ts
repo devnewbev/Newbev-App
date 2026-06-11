@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getSupabase from '@/lib/db';
+import { getTodayStr, getTimeStr } from '@/lib/timezone';
 
 export async function GET(req: NextRequest) {
   try {
@@ -7,9 +8,9 @@ export async function GET(req: NextRequest) {
     const userId = searchParams.get('userId');
     const today = searchParams.get('today');
     const supabase = getSupabase();
+    const todayStr = getTodayStr();
 
     if (today) {
-      const todayStr = new Date().toISOString().split('T')[0];
       const { data } = await supabase
         .from('attendance')
         .select('id, userId:user_id, date, checkinTime:checkin_time, checkoutTime:checkout_time, checkinPhoto:checkin_photo, checkoutPhoto:checkout_photo')
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
     if (userId) {
       const { data } = await supabase
         .from('attendance')
-        .select('id, userId:user_id, date, checkinTime:checkin_time, checkoutTime:checkout_time, checkinPhoto:checkin_photo, checkoutPhoto:checkout_photo')
+        .select('id, userId:user_id, date, checkinTime:checkin_time, checkoutTime:checkout_time')
         .eq('user_id', userId)
         .order('date', { ascending: false })
         .limit(30);
