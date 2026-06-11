@@ -1,31 +1,39 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { getCurrentUser, checkin, checkout, getTodayAttendance, getAttendanceByUser, User, Attendance } from '@/lib/store';
 
 export default function AttendancePage() {
   const [user, setUser] = useState<User | null>(null);
   const [todayRecord, setTodayRecord] = useState<Attendance | null>(null);
   const [history, setHistory] = useState<Attendance[]>([]);
-  const [pendingMode, setPendingMode] = useState<'checkin' | 'checkout' | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputKey = useRef(0);
 
   const loadData = () => {
     const u = getCurrentUser();
     if (!u) return;
     setUser(u);
-    setTodayRecord(getTodayAttendance(u.id));
+    const record = getTodayAttendance(u.id);
+    setTodayRecord(record);
     setHistory(getAttendanceByUser(u.id).reverse());
   };
 
   useEffect(() => { loadData(); }, []);
 
-  const handleCapture = (mode: 'checkin' | 'checkout') => {
-    setPendingMode(mode);
+  const getActionMode = useCallback(() => {
+    const record = todayRecord ?? getTodayAttendance(user?.id ?? 0);
+    if (!record?.checkinTime) return 'checkin';
+    if (record.checkinTime && !record.checkoutTime) return 'checkout';
+    return null;
+  }, [todayRecord, user?.id]);
+
+  const handleCapture = () => {
     setPhoto(null);
     setMsg('');
-    fileInputRef.current?.click();
+    fileInputKey.current += 1;
+    setTimeout(() => fileInputRef.current?.click(), 0);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,21 +50,21 @@ export default function AttendancePage() {
   };
 
   const confirmAction = () => {
-    if (!user || !photo || !pendingMode) return;
-    if (pendingMode === 'checkin') {
+    if (!user || !photo) return;
+    const mode = getActionMode();
+    if (!mode) return;
+    if (mode === 'checkin') {
       checkin(user.id, photo);
       setMsg('Check-in thành công!');
     } else {
       checkout(user.id, photo);
       setMsg('Check-out thành công!');
     }
-    setPendingMode(null);
     setPhoto(null);
     loadData();
   };
 
   const cancelCapture = () => {
-    setPendingMode(null);
     setPhoto(null);
   };
 
@@ -78,6 +86,7 @@ export default function AttendancePage() {
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Chấm công</h1>
 
       <input
+        key={fileInputKey.current}
         ref={fileInputRef}
         type="file"
         accept="image/*"
@@ -112,14 +121,14 @@ export default function AttendancePage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => handleCapture('checkin')}
+            onClick={handleCapture}
             disabled={!!todayRecord?.checkinTime}
             className="flex-1 sm:flex-none px-5 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
           >
             Check-in
           </button>
           <button
-            onClick={() => handleCapture('checkout')}
+            onClick={handleCapture}
             disabled={!todayRecord?.checkinTime || !!todayRecord?.checkoutTime}
             className="flex-1 sm:flex-none px-5 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
           >
@@ -128,12 +137,10 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {pendingMode && photo && (
+      {photo && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-4 sm:p-6 rounded-xl max-w-md w-full">
-            <h3 className="font-semibold text-gray-800 mb-4">
-              {pendingMode === 'checkin' ? 'Xác nhận ảnh Check-in' : 'Xác nhận ảnh Check-out'}
-            </h3>
+            <h3 className="font-semibold text-gray-800 mb-4">Xác nhận ảnh</h3>
             <img src={photo} alt="Captured" className="w-full rounded-lg mb-4 object-cover max-h-80" />
             <div className="flex gap-2">
               <button onClick={() => setPhoto(null)} className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition cursor-pointer">
