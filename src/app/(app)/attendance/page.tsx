@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { getCurrentUser, checkin, checkout, getTodayAttendance, getAttendanceByUser, User, Attendance } from '@/lib/store';
+import { getCurrentUser, checkin, checkout, getAttendanceByUser, User, Attendance } from '@/lib/store';
 import { compressImage } from '@/lib/compress';
 
 export default function AttendancePage() {
@@ -8,8 +8,10 @@ export default function AttendancePage() {
   const [todayRecord, setTodayRecord] = useState<Attendance | null>(null);
   const [history, setHistory] = useState<Attendance[]>([]);
   const [photo, setPhoto] = useState<string | null>(null);
+  const [zoomPhoto, setZoomPhoto] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [action, setAction] = useState<'checkin' | 'checkout' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const userIdRef = useRef(0);
 
@@ -18,17 +20,23 @@ export default function AttendancePage() {
     if (!u) return;
     setUser(u);
     userIdRef.current = u.id;
-    const [record, hist] = await Promise.all([
-      getTodayAttendance(u.id),
-      getAttendanceByUser(u.id),
-    ]);
-    setTodayRecord(record);
+    const hist = await getAttendanceByUser(u.id);
     setHistory(hist);
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayRecords = hist.filter(r => r.date === todayStr);
+    setTodayRecord({
+      id: 0, userId: u.id, date: todayStr,
+      checkinTime: todayRecords.find(r => r.checkinTime)?.checkinTime || null,
+      checkoutTime: todayRecords.find(r => r.checkoutTime)?.checkoutTime || null,
+      checkinPhoto: todayRecords.find(r => r.checkinPhoto)?.checkinPhoto || null,
+      checkoutPhoto: todayRecords.find(r => r.checkoutPhoto)?.checkoutPhoto || null,
+    });
   };
 
   useEffect(() => { loadData(); }, []);
 
-  const handleCapture = () => {
+  const handleCapture = (a: 'checkin' | 'checkout') => {
+    setAction(a);
     setPhoto(null);
     setMsg('');
     setTimeout(() => fileInputRef.current?.click(), 0);
@@ -49,33 +57,21 @@ export default function AttendancePage() {
   };
 
   const confirmAction = async () => {
-    if (!photo || loading) return;
+    if (!photo || loading || !action) return;
     const uid = userIdRef.current;
     if (!uid) return;
     setLoading(true);
+    setMsg('');
     try {
-      const record = await getTodayAttendance(uid);
-      if (!record?.checkinTime) {
+      if (action === 'checkin') {
         await checkin(uid, photo);
-        setTodayRecord({
-          id: 0, userId: uid, date: new Date().toISOString().split('T')[0],
-          checkinTime: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-          checkoutTime: null, checkinPhoto: photo, checkoutPhoto: null,
-        });
         setMsg('Check-in thành công!');
-      } else if (!record.checkoutTime) {
-        await checkout(uid, photo);
-        setTodayRecord({
-          ...record,
-          checkoutTime: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-          checkoutPhoto: photo,
-        });
-        setMsg('Check-out thành công!');
       } else {
-        setMsg('Hôm nay đã checkout rồi.');
-        return;
+        await checkout(uid, photo);
+        setMsg('Check-out thành công!');
       }
       setPhoto(null);
+      setAction(null);
       loadData();
     } catch {
       setMsg('Lỗi kết nối server!');
@@ -85,17 +81,6 @@ export default function AttendancePage() {
   };
 
   const cancelCapture = () => { setPhoto(null); };
-
-  const statusBadge = (record: Attendance) => {
-    const isFull = record.checkinTime && record.checkoutTime;
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-        isFull ? 'bg-green-100 text-green-700' : record.checkinTime ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-      }`}>
-        {isFull ? 'Đủ' : record.checkinTime ? 'Thiếu checkout' : 'Vắng'}
-      </span>
-    );
-  };
 
   if (!user) return null;
 
@@ -118,23 +103,23 @@ export default function AttendancePage() {
             <p className="text-sm text-gray-500 mb-1">Check-in</p>
             <p className="text-lg font-bold text-gray-800">{todayRecord?.checkinTime || '---'}</p>
             {todayRecord?.checkinPhoto && (
-              <img src={todayRecord.checkinPhoto} alt="Checkin" className="mt-2 w-20 h-16 object-cover rounded border" loading="lazy" />
+              <img src={todayRecord.checkinPhoto} alt="Checkin" className="mt-2 w-20 h-16 object-cover rounded border cursor-pointer" loading="lazy" onClick={() => setZoomPhoto(todayRecord.checkinPhoto!)} />
             )}
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500 mb-1">Check-out</p>
             <p className="text-lg font-bold text-gray-800">{todayRecord?.checkoutTime || '---'}</p>
             {todayRecord?.checkoutPhoto && (
-              <img src={todayRecord.checkoutPhoto} alt="Checkout" className="mt-2 w-20 h-16 object-cover rounded border" loading="lazy" />
+              <img src={todayRecord.checkoutPhoto} alt="Checkout" className="mt-2 w-20 h-16 object-cover rounded border cursor-pointer" loading="lazy" onClick={() => setZoomPhoto(todayRecord.checkoutPhoto!)} />
             )}
           </div>
         </div>
         <div className="flex gap-3">
-          <button onClick={handleCapture} disabled={!!todayRecord?.checkinTime}
+          <button onClick={() => handleCapture('checkin')}
             className="flex-1 px-5 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed">
             Check-in
           </button>
-          <button onClick={handleCapture} disabled={!todayRecord?.checkinTime || !!todayRecord?.checkoutTime}
+          <button onClick={() => handleCapture('checkout')}
             className="flex-1 px-5 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed">
             Check-out
           </button>
@@ -159,6 +144,12 @@ export default function AttendancePage() {
         </div>
       )}
 
+      {zoomPhoto && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setZoomPhoto(null)}>
+          <img src={zoomPhoto} alt="Zoom" className="max-w-full max-h-full object-contain rounded-lg" />
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6">
         <h2 className="font-semibold text-gray-800 mb-4">Lịch sử chấm công</h2>
         <div className="overflow-x-auto">
@@ -166,18 +157,36 @@ export default function AttendancePage() {
             <thead>
               <tr className="border-b border-gray-200 text-gray-500">
                 <th className="text-left py-3 px-2">Ngày</th>
-                <th className="text-left py-3 px-2">Check-in</th>
-                <th className="text-left py-3 px-2">Check-out</th>
-                <th className="text-left py-3 px-2">Trạng thái</th>
+                <th className="text-left py-3 px-2">Loại</th>
+                <th className="text-left py-3 px-2">Giờ</th>
+                <th className="text-left py-3 px-2">Ảnh</th>
               </tr>
             </thead>
             <tbody>
               {history.map(record => (
                 <tr key={record.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 px-2">{new Date(record.date).toLocaleDateString('vi-VN')}</td>
-                  <td className="py-3 px-2">{record.checkinTime || '---'}</td>
-                  <td className="py-3 px-2">{record.checkoutTime || '---'}</td>
-                  <td className="py-3 px-2">{statusBadge(record)}</td>
+                  <td className="py-3 px-2">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      record.checkinTime ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                    }`}>
+                      {record.checkinTime ? 'Check-in' : 'Check-out'}
+                    </span>
+                  </td>
+                  <td className="py-3 px-2">{record.checkinTime || record.checkoutTime || '---'}</td>
+                  <td className="py-3 px-2">
+                    {record.checkinPhoto ? (
+                      <img src={record.checkinPhoto} alt="checkin"
+                        className="w-10 h-8 object-cover rounded border cursor-pointer"
+                        loading="lazy"
+                        onClick={() => setZoomPhoto(record.checkinPhoto!)} />
+                    ) : record.checkoutPhoto ? (
+                      <img src={record.checkoutPhoto} alt="checkout"
+                        className="w-10 h-8 object-cover rounded border cursor-pointer"
+                        loading="lazy"
+                        onClick={() => setZoomPhoto(record.checkoutPhoto!)} />
+                    ) : '---'}
+                  </td>
                 </tr>
               ))}
               {history.length === 0 && (

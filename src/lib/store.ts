@@ -180,3 +180,9 @@ export async function updateExplanationStatus(id: number, status: 'approved' | '
     body: JSON.stringify({ status }),
   });
 }
+
+export async function getUsers(): Promise<User[]> {
+  const res = await fetch('/api/users');
+  if (!res.ok) return [];
+  return res.json();
+}

@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
         .select('id, userId:user_id, date, checkinTime:checkin_time, checkoutTime:checkout_time, checkinPhoto:checkin_photo, checkoutPhoto:checkout_photo')
         .eq('user_id', today)
         .eq('date', todayStr)
+        .order('id', { ascending: false })
+        .limit(1)
         .single();
       return NextResponse.json(data || null);
     }
@@ -23,9 +25,9 @@ export async function GET(req: NextRequest) {
     if (userId) {
       const { data } = await supabase
         .from('attendance')
-        .select('id, userId:user_id, date, checkinTime:checkin_time, checkoutTime:checkout_time')
+        .select('id, userId:user_id, date, checkinTime:checkin_time, checkoutTime:checkout_time, checkinPhoto:checkin_photo, checkoutPhoto:checkout_photo')
         .eq('user_id', userId)
-        .order('date', { ascending: false })
+        .order('id', { ascending: false })
         .limit(30);
       return NextResponse.json(data || []);
     }
