@@ -6,13 +6,10 @@ export default function AttendancePage() {
   const [user, setUser] = useState<User | null>(null);
   const [todayRecord, setTodayRecord] = useState<Attendance | null>(null);
   const [history, setHistory] = useState<Attendance[]>([]);
-  const [showCamera, setShowCamera] = useState(false);
-  const [cameraMode, setCameraMode] = useState<'checkin' | 'checkout'>('checkin');
+  const [pendingMode, setPendingMode] = useState<'checkin' | 'checkout' | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadData = () => {
     const u = getCurrentUser();
@@ -24,55 +21,43 @@ export default function AttendancePage() {
 
   useEffect(() => { loadData(); }, []);
 
-  const startCamera = async (mode: 'checkin' | 'checkout') => {
-    setCameraMode(mode);
+  const handleCapture = (mode: 'checkin' | 'checkout') => {
+    setPendingMode(mode);
     setPhoto(null);
     setMsg('');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 320, height: 240 } });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setPhoto(reader.result);
       }
-      setShowCamera(true);
-    } catch {
-      setMsg('Không thể truy cập camera. Vui lòng cho phép quyền truy cập.');
-    }
-  };
-
-  const capturePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-    setPhoto(dataUrl);
-  };
-
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-    setShowCamera(false);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const confirmAction = () => {
-    if (!user || !photo) return;
-    if (cameraMode === 'checkin') {
+    if (!user || !photo || !pendingMode) return;
+    if (pendingMode === 'checkin') {
       checkin(user.id, photo);
       setMsg('Check-in thành công!');
     } else {
       checkout(user.id, photo);
       setMsg('Check-out thành công!');
     }
-    stopCamera();
+    setPendingMode(null);
+    setPhoto(null);
     loadData();
+  };
+
+  const cancelCapture = () => {
+    setPendingMode(null);
+    setPhoto(null);
   };
 
   const statusBadge = (record: Attendance) => {
@@ -91,6 +76,15 @@ export default function AttendancePage() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Chấm công</h1>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="user"
+        className="hidden"
+        onChange={handleFileChange}
+      />
 
       {msg && (
         <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${
@@ -118,14 +112,14 @@ export default function AttendancePage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => startCamera('checkin')}
+            onClick={() => handleCapture('checkin')}
             disabled={!!todayRecord?.checkinTime}
             className="flex-1 sm:flex-none px-5 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
           >
             Check-in
           </button>
           <button
-            onClick={() => startCamera('checkout')}
+            onClick={() => handleCapture('checkout')}
             disabled={!todayRecord?.checkinTime || !!todayRecord?.checkoutTime}
             className="flex-1 sm:flex-none px-5 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
           >
@@ -134,33 +128,21 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {showCamera && (
+      {pendingMode && photo && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-4 sm:p-6 rounded-xl max-w-md w-full">
             <h3 className="font-semibold text-gray-800 mb-4">
-              {cameraMode === 'checkin' ? 'Chụp ảnh Check-in' : 'Chụp ảnh Check-out'}
+              {pendingMode === 'checkin' ? 'Xác nhận ảnh Check-in' : 'Xác nhận ảnh Check-out'}
             </h3>
-            <div className="relative bg-black rounded-lg overflow-hidden mb-4 flex items-center justify-center" style={{ minHeight: 200 }}>
-              <video ref={videoRef} className={`w-full ${photo ? 'hidden' : ''}`} playsInline />
-              {photo && <img src={photo} alt="Captured" className="w-full" />}
-              <canvas ref={canvasRef} className="hidden" />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {!photo ? (
-                <button onClick={capturePhoto} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition cursor-pointer">
-                  Chụp ảnh
-                </button>
-              ) : (
-                <>
-                  <button onClick={() => setPhoto(null)} className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition cursor-pointer">
-                    Chụp lại
-                  </button>
-                  <button onClick={confirmAction} className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition cursor-pointer">
-                    Xác nhận
-                  </button>
-                </>
-              )}
-              <button onClick={stopCamera} className="flex-1 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg text-sm font-medium transition cursor-pointer">
+            <img src={photo} alt="Captured" className="w-full rounded-lg mb-4 object-cover max-h-80" />
+            <div className="flex gap-2">
+              <button onClick={() => setPhoto(null)} className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition cursor-pointer">
+                Chụp lại
+              </button>
+              <button onClick={confirmAction} className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition cursor-pointer">
+                Xác nhận
+              </button>
+              <button onClick={cancelCapture} className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg text-sm font-medium transition cursor-pointer">
                 Hủy
               </button>
             </div>
@@ -170,7 +152,6 @@ export default function AttendancePage() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6">
         <h2 className="font-semibold text-gray-800 mb-4">Lịch sử chấm công</h2>
-        {/* Desktop table */}
         <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -196,7 +177,6 @@ export default function AttendancePage() {
             </tbody>
           </table>
         </div>
-        {/* Mobile cards */}
         <div className="sm:hidden space-y-3">
           {history.length === 0 && (
             <p className="text-center py-6 text-gray-400">Chưa có dữ liệu chấm công</p>

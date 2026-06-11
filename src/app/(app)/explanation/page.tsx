@@ -8,11 +8,8 @@ export default function ExplanationPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ date: '', reason: '' });
   const [photo, setPhoto] = useState<string | null>(null);
-  const [showCamera, setShowCamera] = useState(false);
   const [msg, setMsg] = useState('');
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadData = () => {
     const u = getCurrentUser();
@@ -23,35 +20,21 @@ export default function ExplanationPage() {
 
   useEffect(() => { loadData(); }, []);
 
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 320, height: 240 } });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+  const handleCapture = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setPhoto(reader.result);
       }
-      setShowCamera(true);
-    } catch {
-      setMsg('Không thể truy cập camera.');
-    }
-  };
-
-  const capturePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
-    setPhoto(canvas.toDataURL('image/jpeg', 0.7));
-  };
-
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-    setShowCamera(false);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -101,6 +84,15 @@ export default function ExplanationPage() {
         </button>
       </div>
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
       {msg && (
         <div className="mb-4 px-4 py-3 rounded-lg text-sm font-medium bg-green-50 text-green-700">{msg}</div>
       )}
@@ -122,35 +114,25 @@ export default function ExplanationPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Ảnh đính kèm</label>
-                {!photo && !showCamera && (
-                  <button type="button" onClick={startCamera}
+                {!photo ? (
+                  <button type="button" onClick={handleCapture}
                     className="w-full sm:w-auto px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-lg text-sm font-medium transition cursor-pointer">
                     Chụp ảnh
                   </button>
-                )}
-                {showCamera && (
+                ) : (
                   <div className="space-y-2">
-                    <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center" style={{ minHeight: 200 }}>
-                      <video ref={videoRef} className={`w-full ${photo ? 'hidden' : ''}`} playsInline />
-                      {photo && <img src={photo} alt="Captured" className="w-full" />}
-                      <canvas ref={canvasRef} className="hidden" />
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {!photo ? (
-                        <button type="button" onClick={capturePhoto}
-                          className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition cursor-pointer">Chụp ảnh</button>
-                      ) : (
-                        <button type="button" onClick={() => setPhoto(null)}
-                          className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm transition cursor-pointer">Chụp lại</button>
-                      )}
-                      <button type="button" onClick={stopCamera}
-                        className="flex-1 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg text-sm transition cursor-pointer">Đóng camera</button>
+                    <img src={photo} alt="Captured" className="w-full rounded-lg object-cover max-h-64 border" />
+                    <div className="flex gap-2">
+                      <button type="button" onClick={handleCapture}
+                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm transition cursor-pointer">Chụp lại</button>
+                      <button type="button" onClick={() => setPhoto(null)}
+                        className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg text-sm transition cursor-pointer">Xóa ảnh</button>
                     </div>
                   </div>
                 )}
               </div>
               <div className="flex flex-wrap gap-2 justify-end">
-                <button type="button" onClick={() => { setShowForm(false); stopCamera(); setPhoto(null); }}
+                <button type="button" onClick={() => { setShowForm(false); setPhoto(null); }}
                   className="flex-1 sm:flex-none px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition cursor-pointer">Hủy</button>
                 <button type="submit"
                   className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition cursor-pointer">Gửi giải trình</button>
@@ -162,7 +144,6 @@ export default function ExplanationPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6">
         <h2 className="font-semibold text-gray-800 mb-4">Lịch sử giải trình</h2>
-        {/* Desktop table */}
         <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -195,7 +176,6 @@ export default function ExplanationPage() {
             </tbody>
           </table>
         </div>
-        {/* Mobile cards */}
         <div className="sm:hidden space-y-3">
           {explanations.length === 0 && (
             <p className="text-center py-6 text-gray-400">Chưa có giải trình nào</p>
