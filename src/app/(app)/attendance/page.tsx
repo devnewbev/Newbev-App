@@ -54,6 +54,7 @@ export default function AttendancePage() {
     const uid = userIdRef.current;
     if (!uid) return;
     setLoading(true);
+    setMsg('');
     try {
       const record = await getTodayAttendance(uid);
       if (!record?.checkinTime) {
@@ -64,6 +65,7 @@ export default function AttendancePage() {
         setMsg('Check-out thành công!');
       } else {
         setMsg('Hôm nay đã checkout rồi.');
+        setLoading(false);
         return;
       }
       setPhoto(null);
@@ -76,17 +78,6 @@ export default function AttendancePage() {
   };
 
   const cancelCapture = () => { setPhoto(null); };
-
-  const statusBadge = (record: Attendance) => {
-    const isFull = record.checkinTime && record.checkoutTime;
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-        isFull ? 'bg-green-100 text-green-700' : record.checkinTime ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-      }`}>
-        {isFull ? 'Đủ' : record.checkinTime ? 'Thiếu checkout' : 'Vắng'}
-      </span>
-    );
-  };
 
   if (!user) return null;
 
@@ -103,36 +94,30 @@ export default function AttendancePage() {
       )}
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 mb-6">
-        <h2 className="font-semibold text-gray-800 mb-4">Hôm nay - {new Date().toLocaleDateString('vi-VN')}</h2>
+        <h2 className="font-semibold text-gray-800 mb-4">Hôm nay</h2>
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500 mb-1">Check-in</p>
             <p className="text-lg font-bold text-gray-800">{todayRecord?.checkinTime || '---'}</p>
             {todayRecord?.checkinPhoto && (
-              <img src={todayRecord.checkinPhoto} alt="Checkin" className="mt-2 w-20 h-16 object-cover rounded border cursor-pointer" loading="lazy" onClick={() => setZoomPhoto(todayRecord.checkinPhoto!)} />
+              <img src={todayRecord.checkinPhoto} alt="" className="mt-2 w-20 h-16 object-cover rounded border cursor-pointer" loading="lazy" onClick={() => setZoomPhoto(todayRecord.checkinPhoto!)} />
             )}
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500 mb-1">Check-out</p>
             <p className="text-lg font-bold text-gray-800">{todayRecord?.checkoutTime || '---'}</p>
             {todayRecord?.checkoutPhoto && (
-              <img src={todayRecord.checkoutPhoto} alt="Checkout" className="mt-2 w-20 h-16 object-cover rounded border cursor-pointer" loading="lazy" onClick={() => setZoomPhoto(todayRecord.checkoutPhoto!)} />
+              <img src={todayRecord.checkoutPhoto} alt="" className="mt-2 w-20 h-16 object-cover rounded border cursor-pointer" loading="lazy" onClick={() => setZoomPhoto(todayRecord.checkoutPhoto!)} />
             )}
           </div>
         </div>
         <div className="flex gap-3">
-          <button
-            onClick={handleCapture}
-            disabled={!!todayRecord?.checkinTime}
-            className="flex-1 px-5 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
-          >
+          <button onClick={handleCapture} disabled={!!todayRecord?.checkinTime}
+            className="flex-1 px-5 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed">
             Check-in
           </button>
-          <button
-            onClick={handleCapture}
-            disabled={!todayRecord?.checkinTime || !!todayRecord?.checkoutTime}
-            className="flex-1 px-5 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
-          >
+          <button onClick={handleCapture} disabled={!todayRecord?.checkinTime || !!todayRecord?.checkoutTime}
+            className="flex-1 px-5 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed">
             Check-out
           </button>
         </div>
@@ -142,11 +127,9 @@ export default function AttendancePage() {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-4 sm:p-6 rounded-xl max-w-md w-full">
             <h3 className="font-semibold text-gray-800 mb-4">Xác nhận ảnh</h3>
-            <img src={photo} alt="Captured" className="w-full rounded-lg mb-4 object-cover max-h-80" />
+            <img src={photo} alt="" className="w-full rounded-lg mb-4 object-cover max-h-80" />
             <div className="flex gap-2">
-              <button onClick={cancelCapture} className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition cursor-pointer">
-                Hủy
-              </button>
+              <button onClick={cancelCapture} className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition cursor-pointer">Hủy</button>
               <button onClick={confirmAction} disabled={loading} className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed">
                 {loading ? 'Đang lưu...' : 'Xác nhận'}
               </button>
@@ -157,7 +140,7 @@ export default function AttendancePage() {
 
       {zoomPhoto && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setZoomPhoto(null)}>
-          <img src={zoomPhoto} alt="Zoom" className="max-w-full max-h-full object-contain rounded-lg" />
+          <img src={zoomPhoto} alt="" className="max-w-full max-h-full object-contain rounded-lg" />
         </div>
       )}
 
@@ -169,29 +152,31 @@ export default function AttendancePage() {
               <tr className="border-b border-gray-200 text-gray-500">
                 <th className="text-left py-3 px-2">Ngày</th>
                 <th className="text-left py-3 px-2">Check-in</th>
+                <th className="text-left py-3 px-2">Ảnh check-in</th>
                 <th className="text-left py-3 px-2">Check-out</th>
-                <th className="text-left py-3 px-2">Ảnh</th>
-                <th className="text-left py-3 px-2">Trạng thái</th>
+                <th className="text-left py-3 px-2">Ảnh check-out</th>
               </tr>
             </thead>
             <tbody>
-              {history.map(record => (
-                <tr key={record.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-2">{record.date.split('-').reverse().join('/')}</td>
-                  <td className="py-3 px-2">{record.checkinTime || '---'}</td>
-                  <td className="py-3 px-2">{record.checkoutTime || '---'}</td>
+              {history.map(r => (
+                <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="py-3 px-2">{r.date.split('-').reverse().join('/')}</td>
+                  <td className="py-3 px-2">{r.checkinTime || '---'}</td>
                   <td className="py-3 px-2">
-                    {record.checkinPhoto ? (
-                      <img src={record.checkinPhoto} alt="" className="w-10 h-8 object-cover rounded border cursor-pointer" loading="lazy" onClick={() => setZoomPhoto(record.checkinPhoto!)} />
-                    ) : record.checkoutPhoto ? (
-                      <img src={record.checkoutPhoto} alt="" className="w-10 h-8 object-cover rounded border cursor-pointer" loading="lazy" onClick={() => setZoomPhoto(record.checkoutPhoto!)} />
+                    {r.checkinPhoto ? (
+                      <img src={r.checkinPhoto} alt="" className="w-14 h-10 object-cover rounded border cursor-pointer" loading="lazy" onClick={() => setZoomPhoto(r.checkinPhoto!)} />
                     ) : '---'}
                   </td>
-                  <td className="py-3 px-2">{statusBadge(record)}</td>
+                  <td className="py-3 px-2">{r.checkoutTime || '---'}</td>
+                  <td className="py-3 px-2">
+                    {r.checkoutPhoto ? (
+                      <img src={r.checkoutPhoto} alt="" className="w-14 h-10 object-cover rounded border cursor-pointer" loading="lazy" onClick={() => setZoomPhoto(r.checkoutPhoto!)} />
+                    ) : '---'}
+                  </td>
                 </tr>
               ))}
               {history.length === 0 && (
-                <tr><td colSpan={5} className="text-center py-6 text-gray-400">Chưa có dữ liệu chấm công</td></tr>
+                <tr><td colSpan={5} className="text-center py-6 text-gray-400">Chưa có dữ liệu</td></tr>
               )}
             </tbody>
           </table>
