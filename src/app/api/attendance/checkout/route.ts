@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import getSupabase from '@/lib/db';
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,22 +7,31 @@ export async function POST(req: NextRequest) {
     if (!userId || !photo) {
       return NextResponse.json({ error: 'Missing userId or photo' }, { status: 400 });
     }
+    const supabase = getSupabase();
     const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    const [result] = await pool.query(
-      `UPDATE attendance SET checkout_time = ?, checkout_photo = ? WHERE user_id = ? AND date = CURDATE()`,
-      [now, photo, userId]
-    );
-    const info = result as any;
-    if (info.affectedRows === 0) {
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const { data: existing } = await supabase
+      .from('attendance')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('date', todayStr)
+      .single();
+
+    if (!existing) {
       return NextResponse.json({ error: 'Chưa check-in hôm nay' }, { status: 400 });
     }
-    const [rows] = await pool.query(
-      `SELECT id, user_id as userId, date, checkin_time as checkinTime, checkout_time as checkoutTime, checkin_photo as checkinPhoto, checkout_photo as checkoutPhoto
-       FROM attendance WHERE user_id = ? AND date = CURDATE()`,
-      [userId]
-    );
-    const list = rows as any[];
-    return NextResponse.json(list[0]);
+
+    await supabase.from('attendance').update({ checkout_time: now, checkout_photo: photo }).eq('id', existing.id);
+
+    const { data } = await supabase
+      .from('attendance')
+      .select('id, userId:user_id, date, checkinTime:checkin_time, checkoutTime:checkout_time, checkinPhoto:checkin_photo, checkoutPhoto:checkout_photo')
+      .eq('user_id', userId)
+      .eq('date', todayStr)
+      .single();
+
+    return NextResponse.json(data);
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: 'Lỗi server' }, { status: 500 });

@@ -1,29 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import getSupabase from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId');
     const today = searchParams.get('today');
+    const supabase = getSupabase();
 
     if (today) {
-      const [rows] = await pool.query(
-        `SELECT id, user_id as userId, date, checkin_time as checkinTime, checkout_time as checkoutTime, checkin_photo as checkinPhoto, checkout_photo as checkoutPhoto
-         FROM attendance WHERE user_id = ? AND date = CURDATE()`,
-        [today]
-      );
-      const list = rows as any[];
-      return NextResponse.json(list[0] || null);
+      const todayStr = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('attendance')
+        .select('id, userId:user_id, date, checkinTime:checkin_time, checkoutTime:checkout_time, checkinPhoto:checkin_photo, checkoutPhoto:checkout_photo')
+        .eq('user_id', today)
+        .eq('date', todayStr)
+        .single();
+      return NextResponse.json(data || null);
     }
 
     if (userId) {
-      const [rows] = await pool.query(
-        `SELECT id, user_id as userId, date, checkin_time as checkinTime, checkout_time as checkoutTime, checkin_photo as checkinPhoto, checkout_photo as checkoutPhoto
-         FROM attendance WHERE user_id = ? ORDER BY date DESC LIMIT 30`,
-        [userId]
-      );
-      return NextResponse.json(rows);
+      const { data } = await supabase
+        .from('attendance')
+        .select('id, userId:user_id, date, checkinTime:checkin_time, checkoutTime:checkout_time, checkinPhoto:checkin_photo, checkoutPhoto:checkout_photo')
+        .eq('user_id', userId)
+        .order('date', { ascending: false })
+        .limit(30);
+      return NextResponse.json(data || []);
     }
 
     return NextResponse.json({ error: 'Missing userId or today param' }, { status: 400 });

@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import { NextResponse } from 'next/server';
+import getSupabase from '@/lib/db';
 
 export async function GET() {
   try {
-    const [rows] = await pool.query(
-      'SELECT id, username, name, role FROM users'
-    );
-    return NextResponse.json(rows);
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('users').select('id, username, name, role');
+    if (error) throw error;
+    return NextResponse.json(data || []);
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: 'Lỗi server' }, { status: 500 });

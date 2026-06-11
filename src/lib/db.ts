@@ -1,14 +1,15 @@
-import mysql from 'mysql2/promise';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  port: Number(process.env.DB_PORT) || 3306,
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASS || '',
-  database: process.env.DB_NAME || 'newbev',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
+let client: SupabaseClient | null = null;
 
-export default pool;
+export function getSupabase(): SupabaseClient {
+  if (!client) {
+    client = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+  return client;
+}
+
+export default getSupabase;

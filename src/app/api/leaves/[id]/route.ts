@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import getSupabase from '@/lib/db';
 
 export async function PUT(
   req: NextRequest,
@@ -11,13 +11,17 @@ export async function PUT(
     if (!status || !['approved', 'rejected'].includes(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
-    await pool.query('UPDATE leaves SET status = ? WHERE id = ?', [status, id]);
-    const [rows] = await pool.query('SELECT * FROM leaves WHERE id = ?', [id]);
-    const list = rows as any[];
-    if (list.length === 0) {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('leaves')
+      .update({ status })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error || !data) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-    return NextResponse.json(list[0]);
+    return NextResponse.json(data);
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: 'Lỗi server' }, { status: 500 });

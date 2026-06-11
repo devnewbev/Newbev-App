@@ -1,30 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import getSupabase from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId');
     const all = searchParams.get('all');
+    const supabase = getSupabase();
 
     if (all === '1') {
-      const [rows] = await pool.query(
-        `SELECT l.*, l.user_id as userId, l.start_date as startDate, l.end_date as endDate,
-                l.leave_type as leaveType, l.created_at as createdAt, u.name as userName
-         FROM leaves l JOIN users u ON l.user_id = u.id
-         ORDER BY l.created_at DESC LIMIT 100`
-      );
-      return NextResponse.json(rows);
+      const { data } = await supabase
+        .from('leaves')
+        .select('*, userId:user_id, startDate:start_date, endDate:end_date, leaveType:leave_type, createdAt:created_at, users(name)')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      const result = (data || []).map((l: any) => ({ ...l, userName: l.users?.name }));
+      return NextResponse.json(result);
     }
 
     if (userId) {
-      const [rows] = await pool.query(
-        `SELECT *, user_id as userId, start_date as startDate, end_date as endDate,
-                leave_type as leaveType, created_at as createdAt
-         FROM leaves WHERE user_id = ? ORDER BY created_at DESC LIMIT 30`,
-        [userId]
-      );
-      return NextResponse.json(rows);
+      const { data } = await supabase
+        .from('leaves')
+        .select('*, userId:user_id, startDate:start_date, endDate:end_date, leaveType:leave_type, createdAt:created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(30);
+      return NextResponse.json(data || []);
     }
 
     return NextResponse.json({ error: 'Missing userId or all param' }, { status: 400 });
@@ -40,15 +41,14 @@ export async function POST(req: NextRequest) {
     if (!userId || !startDate || !endDate || !leaveType || !reason) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
-    const [result] = await pool.query(
-      `INSERT INTO leaves (user_id, start_date, end_date, leave_type, reason, days)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [userId, startDate, endDate, leaveType, reason, days || 1]
-    );
-    const info = result as any;
-    const [rows] = await pool.query('SELECT * FROM leaves WHERE id = ?', [info.insertId]);
-    const list = rows as any[];
-    return NextResponse.json(list[0]);
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('leaves')
+      .insert({ user_id: userId, start_date: startDate, end_date: endDate, leave_type: leaveType, reason, days: days || 1 })
+      .select()
+      .single();
+    if (error) throw error;
+    return NextResponse.json(data);
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: 'Lỗi server' }, { status: 500 });
