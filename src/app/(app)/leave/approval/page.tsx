@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { getCurrentUser, getLeaves, updateLeaveStatus, getUsers, User, LeaveRequest } from '@/lib/store';
+import { getCurrentUser, getLeaves, updateLeaveStatus, User, LeaveRequest } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 
 export default function LeaveApprovalPage() {
@@ -8,31 +8,27 @@ export default function LeaveApprovalPage() {
   const [user, setUser] = useState<User | null>(null);
   const [leaves, setLeaves] = useState<(LeaveRequest & { userName: string })[]>([]);
 
-  const loadData = () => {
+  const loadData = async () => {
     const u = getCurrentUser();
     if (!u || u.role !== 'admin') {
       router.replace('/dashboard');
       return;
     }
     setUser(u);
-    const users = getUsers();
-    const allLeaves = getLeaves().reverse();
-    setLeaves(allLeaves.map(l => ({
-      ...l,
-      userName: users.find(u2 => u2.id === l.userId)?.name || 'Unknown',
-    })));
+    const allLeaves = await getLeaves();
+    setLeaves(allLeaves as (LeaveRequest & { userName: string })[]);
   };
 
   useEffect(() => { loadData(); }, [router]);
 
-  const handleApprove = (id: number) => {
-    updateLeaveStatus(id, 'approved');
-    loadData();
+  const handleApprove = async (id: number) => {
+    await updateLeaveStatus(id, 'approved');
+    await loadData();
   };
 
-  const handleReject = (id: number) => {
-    updateLeaveStatus(id, 'rejected');
-    loadData();
+  const handleReject = async (id: number) => {
+    await updateLeaveStatus(id, 'rejected');
+    await loadData();
   };
 
   if (!user) return null;
@@ -57,8 +53,7 @@ export default function LeaveApprovalPage() {
       <p className="text-gray-500 mb-6">Quản lý và duyệt đơn nghỉ phép của nhân viên</p>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6">
-        {/* Desktop table */}
-        <div className="hidden sm:block overflow-x-auto">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-gray-500">
@@ -101,50 +96,6 @@ export default function LeaveApprovalPage() {
               )}
             </tbody>
           </table>
-        </div>
-        {/* Mobile cards */}
-        <div className="sm:hidden space-y-3">
-          {leaves.length === 0 && (
-            <p className="text-center py-6 text-gray-400">Chưa có đơn nghỉ phép nào</p>
-          )}
-          {leaves.map(l => (
-            <div key={l.id} className="border border-gray-100 rounded-lg p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-gray-800">{l.userName}</span>
-                {statusBadge(l.status)}
-              </div>
-              <div className="text-sm text-gray-600 space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Loại:</span>
-                  <span>{l.leaveType}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Từ ngày:</span>
-                  <span>{new Date(l.startDate).toLocaleDateString('vi-VN')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Đến ngày:</span>
-                  <span>{new Date(l.endDate).toLocaleDateString('vi-VN')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Số ngày:</span>
-                  <span>{l.days}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Lý do:</span>
-                  <span className="text-right max-w-[60%] truncate">{l.reason}</span>
-                </div>
-              </div>
-              {l.status === 'pending' && (
-                <div className="flex gap-2 pt-1">
-                  <button onClick={() => handleApprove(l.id)}
-                    className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition cursor-pointer">Duyệt</button>
-                  <button onClick={() => handleReject(l.id)}
-                    className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-medium transition cursor-pointer">Từ chối</button>
-                </div>
-              )}
-            </div>
-          ))}
         </div>
       </div>
     </div>

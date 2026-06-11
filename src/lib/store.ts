@@ -1,7 +1,6 @@
 export interface User {
   id: number;
   username: string;
-  password: string;
   name: string;
   role: 'admin' | 'employee';
 }
@@ -26,6 +25,7 @@ export interface LeaveRequest {
   status: 'pending' | 'approved' | 'rejected';
   days: number;
   createdAt: string;
+  userName?: string;
 }
 
 export interface Explanation {
@@ -36,173 +36,147 @@ export interface Explanation {
   photo: string | null;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
+  userName?: string;
 }
 
-const DEFAULT_USERS: User[] = [
-  { id: 1, username: 'admin', password: '1234', name: 'Admin', role: 'admin' },
-  { id: 2, username: 'user', password: '1234', name: 'Nhân Viên', role: 'employee' },
-];
+const SESSION_KEY = 'hrm_current_user';
 
-const STORAGE_KEYS = {
-  users: 'hrm_users',
-  attendance: 'hrm_attendance',
-  leaves: 'hrm_leaves',
-  explanations: 'hrm_explanations',
-  currentUser: 'hrm_current_user',
-};
-
-function getItem<T>(key: string, fallback: T): T {
-  if (typeof window === 'undefined') return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function setItem(key: string, value: unknown) {
+export function saveSession(user: User) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(key, JSON.stringify(value));
+  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
 }
 
-export function initStore() {
-  const existing = getItem<User[]>(STORAGE_KEYS.users, []);
-  if (existing.length === 0) {
-    setItem(STORAGE_KEYS.users, DEFAULT_USERS);
+export function getCurrentUser(): User | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
   }
-}
-
-export function getUsers(): User[] {
-  return getItem<User[]>(STORAGE_KEYS.users, DEFAULT_USERS);
-}
-
-export function authenticate(username: string, password: string): User | null {
-  const users = getItem<User[]>(STORAGE_KEYS.users, DEFAULT_USERS);
-  const user = users.find(u => u.username === username && u.password === password);
-  if (user) {
-    setItem(STORAGE_KEYS.currentUser, user);
-    return user;
-  }
-  return null;
 }
 
 export function logout() {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(STORAGE_KEYS.currentUser);
-}
-
-export function getCurrentUser(): User | null {
-  return getItem<User | null>(STORAGE_KEYS.currentUser, null);
+  localStorage.removeItem(SESSION_KEY);
 }
 
 export function isAuthenticated(): boolean {
   return getCurrentUser() !== null;
 }
 
-export function getAttendance(): Attendance[] {
-  return getItem<Attendance[]>(STORAGE_KEYS.attendance, []);
+export async function authenticate(username: string, password: string): Promise<User | null> {
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) return null;
+  const user: User = await res.json();
+  saveSession(user);
+  return user;
 }
 
-export function getAttendanceByUser(userId: number): Attendance[] {
-  return getAttendance().filter(a => a.userId === userId);
+export async function getTodayAttendance(userId: number): Promise<Attendance | null> {
+  const res = await fetch(`/api/attendance?today=${userId}`);
+  if (!res.ok) return null;
+  return res.json();
 }
 
-export function getTodayAttendance(userId: number): Attendance | null {
-  const today = new Date().toISOString().split('T')[0];
-  return getAttendance().find(a => a.userId === userId && a.date === today) || null;
+export async function getAttendanceByUser(userId: number): Promise<Attendance[]> {
+  const res = await fetch(`/api/attendance?userId=${userId}`);
+  if (!res.ok) return [];
+  return res.json();
 }
 
-export function checkin(userId: number, photo: string): Attendance {
-  const list = getAttendance();
-  const today = new Date().toISOString().split('T')[0];
-  const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  const existing = list.findIndex(a => a.userId === userId && a.date === today);
-  const record: Attendance = {
-    id: Date.now(),
-    userId,
-    date: today,
-    checkinTime: now,
-    checkoutTime: null,
-    checkinPhoto: photo,
-    checkoutPhoto: null,
-  };
-  if (existing >= 0) {
-    list[existing] = { ...list[existing], checkinTime: now, checkinPhoto: photo };
-  } else {
-    list.push(record);
-  }
-  setItem(STORAGE_KEYS.attendance, list);
-  return existing >= 0 ? list[existing] : record;
+export async function checkin(userId: number, photo: string): Promise<Attendance | null> {
+  const res = await fetch('/api/attendance/checkin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, photo }),
+  });
+  if (!res.ok) return null;
+  return res.json();
 }
 
-export function checkout(userId: number, photo: string): Attendance | null {
-  const list = getAttendance();
-  const today = new Date().toISOString().split('T')[0];
-  const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  const idx = list.findIndex(a => a.userId === userId && a.date === today);
-  if (idx < 0) return null;
-  list[idx] = { ...list[idx], checkoutTime: now, checkoutPhoto: photo };
-  setItem(STORAGE_KEYS.attendance, list);
-  return list[idx];
+export async function checkout(userId: number, photo: string): Promise<Attendance | null> {
+  const res = await fetch('/api/attendance/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, photo }),
+  });
+  if (!res.ok) return null;
+  return res.json();
 }
 
-export function getLeaves(): LeaveRequest[] {
-  return getItem<LeaveRequest[]>(STORAGE_KEYS.leaves, []);
+export async function getLeavesByUser(userId: number): Promise<LeaveRequest[]> {
+  const res = await fetch(`/api/leaves?userId=${userId}`);
+  if (!res.ok) return [];
+  return res.json();
 }
 
-export function getLeavesByUser(userId: number): LeaveRequest[] {
-  return getLeaves().filter(l => l.userId === userId);
+export async function getLeaves(): Promise<LeaveRequest[]> {
+  const res = await fetch('/api/leaves?all=1');
+  if (!res.ok) return [];
+  return res.json();
 }
 
-export function createLeave(leave: Omit<LeaveRequest, 'id' | 'status' | 'createdAt'>): LeaveRequest {
-  const list = getLeaves();
-  const record: LeaveRequest = {
-    ...leave,
-    id: Date.now(),
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-  };
-  list.push(record);
-  setItem(STORAGE_KEYS.leaves, list);
-  return record;
+export async function createLeave(data: {
+  userId: number;
+  startDate: string;
+  endDate: string;
+  leaveType: string;
+  reason: string;
+  days: number;
+}): Promise<LeaveRequest | null> {
+  const res = await fetch('/api/leaves', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) return null;
+  return res.json();
 }
 
-export function updateLeaveStatus(id: number, status: 'approved' | 'rejected'): LeaveRequest | null {
-  const list = getLeaves();
-  const idx = list.findIndex(l => l.id === id);
-  if (idx < 0) return null;
-  list[idx] = { ...list[idx], status };
-  setItem(STORAGE_KEYS.leaves, list);
-  return list[idx];
+export async function updateLeaveStatus(id: number, status: 'approved' | 'rejected'): Promise<void> {
+  await fetch(`/api/leaves/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
 }
 
-export function getExplanations(): Explanation[] {
-  return getItem<Explanation[]>(STORAGE_KEYS.explanations, []);
+export async function getExplanationsByUser(userId: number): Promise<Explanation[]> {
+  const res = await fetch(`/api/explanations?userId=${userId}`);
+  if (!res.ok) return [];
+  return res.json();
 }
 
-export function getExplanationsByUser(userId: number): Explanation[] {
-  return getExplanations().filter(e => e.userId === userId);
+export async function getExplanations(): Promise<Explanation[]> {
+  const res = await fetch('/api/explanations?all=1');
+  if (!res.ok) return [];
+  return res.json();
 }
 
-export function createExplanation(exp: Omit<Explanation, 'id' | 'status' | 'createdAt'>): Explanation {
-  const list = getExplanations();
-  const record: Explanation = {
-    ...exp,
-    id: Date.now(),
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-  };
-  list.push(record);
-  setItem(STORAGE_KEYS.explanations, list);
-  return record;
+export async function createExplanation(data: {
+  userId: number;
+  date: string;
+  reason: string;
+  photo: string | null;
+}): Promise<Explanation | null> {
+  const res = await fetch('/api/explanations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) return null;
+  return res.json();
 }
 
-export function updateExplanationStatus(id: number, status: 'approved' | 'rejected'): Explanation | null {
-  const list = getExplanations();
-  const idx = list.findIndex(e => e.id === id);
-  if (idx < 0) return null;
-  list[idx] = { ...list[idx], status };
-  setItem(STORAGE_KEYS.explanations, list);
-  return list[idx];
+export async function updateExplanationStatus(id: number, status: 'approved' | 'rejected'): Promise<void> {
+  await fetch(`/api/explanations/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
 }

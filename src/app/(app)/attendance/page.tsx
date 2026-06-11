@@ -8,17 +8,21 @@ export default function AttendancePage() {
   const [history, setHistory] = useState<Attendance[]>([]);
   const [photo, setPhoto] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const userIdRef = useRef(0);
 
-  const loadData = () => {
+  const loadData = async () => {
     const u = getCurrentUser();
     if (!u) return;
     setUser(u);
     userIdRef.current = u.id;
-    const record = getTodayAttendance(u.id);
+    const [record, hist] = await Promise.all([
+      getTodayAttendance(u.id),
+      getAttendanceByUser(u.id),
+    ]);
     setTodayRecord(record);
-    setHistory(getAttendanceByUser(u.id).reverse());
+    setHistory(hist);
   };
 
   useEffect(() => { loadData(); }, []);
@@ -42,23 +46,30 @@ export default function AttendancePage() {
     e.target.value = '';
   };
 
-  const confirmAction = () => {
-    if (!photo) return;
+  const confirmAction = async () => {
+    if (!photo || loading) return;
     const uid = userIdRef.current;
     if (!uid) return;
-    const record = getTodayAttendance(uid);
-    if (!record?.checkinTime) {
-      checkin(uid, photo);
-      setMsg('Check-in thành công!');
-    } else if (record.checkinTime && !record.checkoutTime) {
-      checkout(uid, photo);
-      setMsg('Check-out thành công!');
-    } else {
-      setMsg('Không thể thực hiện. Đã checkout hoặc chưa check-in.');
-      return;
+    setLoading(true);
+    try {
+      const record = await getTodayAttendance(uid);
+      if (!record?.checkinTime) {
+        await checkin(uid, photo);
+        setMsg('Check-in thành công!');
+      } else if (!record.checkoutTime) {
+        await checkout(uid, photo);
+        setMsg('Check-out thành công!');
+      } else {
+        setMsg('Hôm nay đã checkout rồi.');
+        return;
+      }
+      setPhoto(null);
+      await loadData();
+    } catch {
+      setMsg('Lỗi kết nối server!');
+    } finally {
+      setLoading(false);
     }
-    setPhoto(null);
-    loadData();
   };
 
   const cancelCapture = () => {
@@ -99,7 +110,7 @@ export default function AttendancePage() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 mb-6">
         <h2 className="font-semibold text-gray-800 mb-4">Hôm nay - {new Date().toLocaleDateString('vi-VN')}</h2>
-        <div className="grid grid-cols-1 xs:grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500 mb-1">Check-in</p>
             <p className="text-lg font-bold text-gray-800">{todayRecord?.checkinTime || '---'}</p>
@@ -115,18 +126,18 @@ export default function AttendancePage() {
             )}
           </div>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex gap-3">
           <button
             onClick={handleCapture}
             disabled={!!todayRecord?.checkinTime}
-            className="flex-1 sm:flex-none px-5 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
+            className="flex-1 px-5 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
           >
             Check-in
           </button>
           <button
             onClick={handleCapture}
             disabled={!todayRecord?.checkinTime || !!todayRecord?.checkoutTime}
-            className="flex-1 sm:flex-none px-5 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
+            className="flex-1 px-5 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
           >
             Check-out
           </button>
@@ -139,14 +150,11 @@ export default function AttendancePage() {
             <h3 className="font-semibold text-gray-800 mb-4">Xác nhận ảnh</h3>
             <img src={photo} alt="Captured" className="w-full rounded-lg mb-4 object-cover max-h-80" />
             <div className="flex gap-2">
-              <button onClick={() => setPhoto(null)} className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition cursor-pointer">
-                Chụp lại
-              </button>
-              <button onClick={confirmAction} className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition cursor-pointer">
-                Xác nhận
-              </button>
-              <button onClick={cancelCapture} className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg text-sm font-medium transition cursor-pointer">
+              <button onClick={cancelCapture} className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition cursor-pointer">
                 Hủy
+              </button>
+              <button onClick={confirmAction} disabled={loading} className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed">
+                {loading ? 'Đang lưu...' : 'Xác nhận'}
               </button>
             </div>
           </div>
@@ -155,7 +163,7 @@ export default function AttendancePage() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6">
         <h2 className="font-semibold text-gray-800 mb-4">Lịch sử chấm công</h2>
-        <div className="hidden sm:block overflow-x-auto">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-gray-500">
@@ -179,29 +187,6 @@ export default function AttendancePage() {
               )}
             </tbody>
           </table>
-        </div>
-        <div className="sm:hidden space-y-3">
-          {history.length === 0 && (
-            <p className="text-center py-6 text-gray-400">Chưa có dữ liệu chấm công</p>
-          )}
-          {history.map(record => (
-            <div key={record.id} className="border border-gray-100 rounded-lg p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-gray-800">{new Date(record.date).toLocaleDateString('vi-VN')}</span>
-                {statusBadge(record)}
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="text-gray-500">Check-in: </span>
-                  <span className="font-medium">{record.checkinTime || '---'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Check-out: </span>
-                  <span className="font-medium">{record.checkoutTime || '---'}</span>
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </div>

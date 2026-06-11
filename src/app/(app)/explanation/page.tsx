@@ -9,13 +9,14 @@ export default function ExplanationPage() {
   const [form, setForm] = useState({ date: '', reason: '' });
   const [photo, setPhoto] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const loadData = () => {
+  const loadData = async () => {
     const u = getCurrentUser();
     if (!u) return;
     setUser(u);
-    setExplanations(getExplanationsByUser(u.id).reverse());
+    setExplanations(await getExplanationsByUser(u.id));
   };
 
   useEffect(() => { loadData(); }, []);
@@ -37,20 +38,27 @@ export default function ExplanationPage() {
     e.target.value = '';
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-    createExplanation({
-      userId: user.id,
-      date: form.date,
-      reason: form.reason,
-      photo,
-    });
-    setMsg('Gửi giải trình thành công!');
-    setShowForm(false);
-    setForm({ date: '', reason: '' });
-    setPhoto(null);
-    loadData();
+    if (!user || loading) return;
+    setLoading(true);
+    try {
+      await createExplanation({
+        userId: user.id,
+        date: form.date,
+        reason: form.reason,
+        photo,
+      });
+      setMsg('Gửi giải trình thành công!');
+      setShowForm(false);
+      setForm({ date: '', reason: '' });
+      setPhoto(null);
+      await loadData();
+    } catch {
+      setMsg('Lỗi kết nối server!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const statusBadge = (status: string) => {
@@ -71,14 +79,14 @@ export default function ExplanationPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Giải trình công</h1>
           <p className="text-gray-500">Giải trình ngày công không hợp lệ</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition cursor-pointer"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition cursor-pointer"
         >
           + Giải trình mới
         </button>
@@ -94,7 +102,7 @@ export default function ExplanationPage() {
       />
 
       {msg && (
-        <div className="mb-4 px-4 py-3 rounded-lg text-sm font-medium bg-green-50 text-green-700">{msg}</div>
+        <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${msg.includes('thành công') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>{msg}</div>
       )}
 
       {showForm && (
@@ -116,7 +124,7 @@ export default function ExplanationPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Ảnh đính kèm</label>
                 {!photo ? (
                   <button type="button" onClick={handleCapture}
-                    className="w-full sm:w-auto px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-lg text-sm font-medium transition cursor-pointer">
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-lg text-sm font-medium transition cursor-pointer">
                     Chụp ảnh
                   </button>
                 ) : (
@@ -131,11 +139,13 @@ export default function ExplanationPage() {
                   </div>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2 justify-end">
+              <div className="flex gap-2 justify-end">
                 <button type="button" onClick={() => { setShowForm(false); setPhoto(null); }}
-                  className="flex-1 sm:flex-none px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition cursor-pointer">Hủy</button>
-                <button type="submit"
-                  className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition cursor-pointer">Gửi giải trình</button>
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition cursor-pointer">Hủy</button>
+                <button type="submit" disabled={loading}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed">
+                  {loading ? 'Đang gửi...' : 'Gửi giải trình'}
+                </button>
               </div>
             </form>
           </div>
@@ -144,7 +154,7 @@ export default function ExplanationPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6">
         <h2 className="font-semibold text-gray-800 mb-4">Lịch sử giải trình</h2>
-        <div className="hidden sm:block overflow-x-auto">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-gray-500">
@@ -175,36 +185,6 @@ export default function ExplanationPage() {
               )}
             </tbody>
           </table>
-        </div>
-        <div className="sm:hidden space-y-3">
-          {explanations.length === 0 && (
-            <p className="text-center py-6 text-gray-400">Chưa có giải trình nào</p>
-          )}
-          {explanations.map(e => (
-            <div key={e.id} className="border border-gray-100 rounded-lg p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-gray-800">{new Date(e.date).toLocaleDateString('vi-VN')}</span>
-                {statusBadge(e.status)}
-              </div>
-              <div className="text-sm text-gray-600 space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Ngày gửi:</span>
-                  <span>{new Date(e.createdAt).toLocaleDateString('vi-VN')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Lý do:</span>
-                  <span className="text-right max-w-[60%] truncate">{e.reason}</span>
-                </div>
-                {e.photo && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500">Ảnh:</span>
-                    <img src={e.photo} alt="Proof" className="w-12 h-10 object-cover rounded border cursor-pointer"
-                      onClick={() => window.open(e.photo!, '_blank')} />
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </div>
