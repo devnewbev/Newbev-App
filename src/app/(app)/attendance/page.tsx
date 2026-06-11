@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getCurrentUser, checkin, checkout, getTodayAttendance, getAttendanceByUser, User, Attendance } from '@/lib/store';
 
 export default function AttendancePage() {
@@ -9,12 +9,13 @@ export default function AttendancePage() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const fileInputKey = useRef(0);
+  const userIdRef = useRef(0);
 
   const loadData = () => {
     const u = getCurrentUser();
     if (!u) return;
     setUser(u);
+    userIdRef.current = u.id;
     const record = getTodayAttendance(u.id);
     setTodayRecord(record);
     setHistory(getAttendanceByUser(u.id).reverse());
@@ -22,17 +23,9 @@ export default function AttendancePage() {
 
   useEffect(() => { loadData(); }, []);
 
-  const getActionMode = useCallback(() => {
-    const record = todayRecord ?? getTodayAttendance(user?.id ?? 0);
-    if (!record?.checkinTime) return 'checkin';
-    if (record.checkinTime && !record.checkoutTime) return 'checkout';
-    return null;
-  }, [todayRecord, user?.id]);
-
   const handleCapture = () => {
     setPhoto(null);
     setMsg('');
-    fileInputKey.current += 1;
     setTimeout(() => fileInputRef.current?.click(), 0);
   };
 
@@ -50,15 +43,19 @@ export default function AttendancePage() {
   };
 
   const confirmAction = () => {
-    if (!user || !photo) return;
-    const mode = getActionMode();
-    if (!mode) return;
-    if (mode === 'checkin') {
-      checkin(user.id, photo);
+    if (!photo) return;
+    const uid = userIdRef.current;
+    if (!uid) return;
+    const record = getTodayAttendance(uid);
+    if (!record?.checkinTime) {
+      checkin(uid, photo);
       setMsg('Check-in thành công!');
-    } else {
-      checkout(user.id, photo);
+    } else if (record.checkinTime && !record.checkoutTime) {
+      checkout(uid, photo);
       setMsg('Check-out thành công!');
+    } else {
+      setMsg('Không thể thực hiện. Đã checkout hoặc chưa check-in.');
+      return;
     }
     setPhoto(null);
     loadData();
@@ -86,7 +83,6 @@ export default function AttendancePage() {
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Chấm công</h1>
 
       <input
-        key={fileInputKey.current}
         ref={fileInputRef}
         type="file"
         accept="image/*"
