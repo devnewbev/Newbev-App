@@ -8,6 +8,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const u = getCurrentUser();
@@ -17,6 +18,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
     setUser(u);
   }, [router]);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   const handleLogout = () => {
     logout();
@@ -38,7 +43,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-20 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`fixed lg:sticky top-0 left-0 z-30 w-64 bg-white border-r border-gray-200 flex flex-col transition-transform duration-200 lg:translate-x-0 ${
+        mobileOpen ? 'translate-x-0' : '-translate-x-full'
+      } h-full`}>
         <div className="p-5 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -61,7 +77,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </div>
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {navItems.map(item => {
             const active = pathname === item.href;
             return (
@@ -94,7 +110,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </aside>
-      <main className="flex-1 p-6 overflow-auto">{children}</main>
+
+      {/* Main content */}
+      <main className="flex-1 min-w-0">
+        {/* Mobile top bar */}
+        <div className="sticky top-0 z-10 lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition cursor-pointer"
+            aria-label="Mở menu"
+          >
+            <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">H</span>
+            </div>
+            <span className="font-bold text-gray-800">HRM System</span>
+          </div>
+          <div className="w-9 h-9 bg-indigo-100 rounded-full flex items-center justify-center">
+            <span className="text-indigo-600 font-bold text-sm">{user.name.charAt(0)}</span>
+          </div>
+        </div>
+        <div className="p-4 lg:p-6">{children}</div>
+      </main>
     </div>
   );
 }

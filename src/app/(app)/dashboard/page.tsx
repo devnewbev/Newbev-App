@@ -27,8 +27,8 @@ export default function Dashboard() {
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-1">Xin chào, {user.name}!</h1>
       <p className="text-gray-500 mb-6">Tổng quan hoạt động của bạn</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+        <div className="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
               <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -75,6 +75,17 @@ export default function AttendancePage() {
     loadData();
   };
 
+  const statusBadge = (record: Attendance) => {
+    const isFull = record.checkinTime && record.checkoutTime;
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+        isFull ? 'bg-green-100 text-green-700' : record.checkinTime ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+      }`}>
+        {isFull ? 'Đủ' : record.checkinTime ? 'Thiếu checkout' : 'Vắng'}
+      </span>
+    );
+  };
+
   if (!user) return null;
 
   return (
@@ -87,9 +98,9 @@ export default function AttendancePage() {
         }`}>{msg}</div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 mb-6">
         <h2 className="font-semibold text-gray-800 mb-4">Hôm nay - {new Date().toLocaleDateString('vi-VN')}</h2>
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 xs:grid-cols-2 gap-4 mb-4">
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500 mb-1">Check-in</p>
             <p className="text-lg font-bold text-gray-800">{todayRecord?.checkinTime || '---'}</p>
@@ -105,18 +116,18 @@ export default function AttendancePage() {
             )}
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button
             onClick={() => startCamera('checkin')}
             disabled={!!todayRecord?.checkinTime}
-            className="px-5 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
+            className="flex-1 sm:flex-none px-5 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
           >
             Check-in
           </button>
           <button
             onClick={() => startCamera('checkout')}
             disabled={!todayRecord?.checkinTime || !!todayRecord?.checkoutTime}
-            className="px-5 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
+            className="flex-1 sm:flex-none px-5 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:cursor-not-allowed"
           >
             Check-out
           </button>
@@ -124,8 +135,8 @@ export default function AttendancePage() {
       </div>
 
       {showCamera && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-4 sm:p-6 rounded-xl max-w-md w-full">
             <h3 className="font-semibold text-gray-800 mb-4">
               {cameraMode === 'checkin' ? 'Chụp ảnh Check-in' : 'Chụp ảnh Check-out'}
             </h3>
@@ -134,7 +145,7 @@ export default function AttendancePage() {
               {photo && <img src={photo} alt="Captured" className="w-full" />}
               <canvas ref={canvasRef} className="hidden" />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {!photo ? (
                 <button onClick={capturePhoto} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition cursor-pointer">
                   Chụp ảnh
@@ -149,7 +160,7 @@ export default function AttendancePage() {
                   </button>
                 </>
               )}
-              <button onClick={stopCamera} className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg text-sm font-medium transition cursor-pointer">
+              <button onClick={stopCamera} className="flex-1 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg text-sm font-medium transition cursor-pointer">
                 Hủy
               </button>
             </div>
@@ -157,9 +168,10 @@ export default function AttendancePage() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6">
         <h2 className="font-semibold text-gray-800 mb-4">Lịch sử chấm công</h2>
-        <div className="overflow-x-auto">
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-gray-500">
@@ -175,17 +187,7 @@ export default function AttendancePage() {
                   <td className="py-3 px-2">{new Date(record.date).toLocaleDateString('vi-VN')}</td>
                   <td className="py-3 px-2">{record.checkinTime || '---'}</td>
                   <td className="py-3 px-2">{record.checkoutTime || '---'}</td>
-                  <td className="py-3 px-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      record.checkinTime && record.checkoutTime
-                        ? 'bg-green-100 text-green-700'
-                        : record.checkinTime
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-red-100 text-red-700'
-                    }`}>
-                      {record.checkinTime && record.checkoutTime ? 'Đủ' : record.checkinTime ? 'Thiếu checkout' : 'Vắng'}
-                    </span>
-                  </td>
+                  <td className="py-3 px-2">{statusBadge(record)}</td>
                 </tr>
               ))}
               {history.length === 0 && (
@@ -193,6 +195,30 @@ export default function AttendancePage() {
               )}
             </tbody>
           </table>
+        </div>
+        {/* Mobile cards */}
+        <div className="sm:hidden space-y-3">
+          {history.length === 0 && (
+            <p className="text-center py-6 text-gray-400">Chưa có dữ liệu chấm công</p>
+          )}
+          {history.map(record => (
+            <div key={record.id} className="border border-gray-100 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-gray-800">{new Date(record.date).toLocaleDateString('vi-VN')}</span>
+                {statusBadge(record)}
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-gray-500">Check-in: </span>
+                  <span className="font-medium">{record.checkinTime || '---'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Check-out: </span>
+                  <span className="font-medium">{record.checkoutTime || '---'}</span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

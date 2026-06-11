@@ -88,14 +88,14 @@ export default function ExplanationPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Giải trình công</h1>
           <p className="text-gray-500">Giải trình ngày công không hợp lệ</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition cursor-pointer"
+          className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition cursor-pointer"
         >
           + Giải trình mới
         </button>
@@ -106,8 +106,8 @@ export default function ExplanationPage() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl max-w-lg w-full mx-4">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-4 sm:p-6 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <h3 className="font-semibold text-gray-800 mb-4">Tạo giải trình công</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -124,8 +124,8 @@ export default function ExplanationPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Ảnh đính kèm</label>
                 {!photo && !showCamera && (
                   <button type="button" onClick={startCamera}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-lg text-sm font-medium transition cursor-pointer">
-                    📸 Chụp ảnh
+                    className="w-full sm:w-auto px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-lg text-sm font-medium transition cursor-pointer">
+                    Chụp ảnh
                   </button>
                 )}
                 {showCamera && (
@@ -135,34 +135,35 @@ export default function ExplanationPage() {
                       {photo && <img src={photo} alt="Captured" className="w-full" />}
                       <canvas ref={canvasRef} className="hidden" />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {!photo ? (
                         <button type="button" onClick={capturePhoto}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition cursor-pointer">Chụp ảnh</button>
+                          className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition cursor-pointer">Chụp ảnh</button>
                       ) : (
                         <button type="button" onClick={() => setPhoto(null)}
-                          className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm transition cursor-pointer">Chụp lại</button>
+                          className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm transition cursor-pointer">Chụp lại</button>
                       )}
                       <button type="button" onClick={stopCamera}
-                        className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg text-sm transition cursor-pointer">Đóng camera</button>
+                        className="flex-1 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg text-sm transition cursor-pointer">Đóng camera</button>
                     </div>
                   </div>
                 )}
               </div>
-              <div className="flex gap-2 justify-end">
+              <div className="flex flex-wrap gap-2 justify-end">
                 <button type="button" onClick={() => { setShowForm(false); stopCamera(); setPhoto(null); }}
-                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition cursor-pointer">Hủy</button>
+                  className="flex-1 sm:flex-none px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition cursor-pointer">Hủy</button>
                 <button type="submit"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition cursor-pointer">Gửi giải trình</button>
+                  className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition cursor-pointer">Gửi giải trình</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6">
         <h2 className="font-semibold text-gray-800 mb-4">Lịch sử giải trình</h2>
-        <div className="overflow-x-auto">
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-gray-500">
@@ -193,6 +194,37 @@ export default function ExplanationPage() {
               )}
             </tbody>
           </table>
+        </div>
+        {/* Mobile cards */}
+        <div className="sm:hidden space-y-3">
+          {explanations.length === 0 && (
+            <p className="text-center py-6 text-gray-400">Chưa có giải trình nào</p>
+          )}
+          {explanations.map(e => (
+            <div key={e.id} className="border border-gray-100 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-gray-800">{new Date(e.date).toLocaleDateString('vi-VN')}</span>
+                {statusBadge(e.status)}
+              </div>
+              <div className="text-sm text-gray-600 space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Ngày gửi:</span>
+                  <span>{new Date(e.createdAt).toLocaleDateString('vi-VN')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Lý do:</span>
+                  <span className="text-right max-w-[60%] truncate">{e.reason}</span>
+                </div>
+                {e.photo && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Ảnh:</span>
+                    <img src={e.photo} alt="Proof" className="w-12 h-10 object-cover rounded border cursor-pointer"
+                      onClick={() => window.open(e.photo!, '_blank')} />
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
